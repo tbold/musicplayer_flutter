@@ -2,42 +2,42 @@ import 'package:flutter/material.dart';
 
 enum PlayState { isPlaying, isStopped, isPaused }
 
-abstract class PlayerState {
-  abstract final PlayerState nextState;
+abstract class PlayerWidgetState {
+  abstract final PlayerWidgetState nextState;
   abstract final IconData icon;
 }
 
-class PausedState implements PlayerState {
+class PausedState implements PlayerWidgetState {
   PlayState currentState = PlayState.isPaused;
 
   PausedState() : super();
 
   @override
-  PlayerState get nextState => PlayingState();
+  PlayerWidgetState get nextState => PlayingState();
 
   @override
   IconData get icon => Icons.pause;
 }
 
-class StoppedState implements PlayerState {
+class StoppedState implements PlayerWidgetState {
   PlayState currentState = PlayState.isStopped;
 
   StoppedState() : super();
 
   @override
-  PlayerState get nextState => PlayingState();
+  PlayerWidgetState get nextState => PlayingState();
   @override
   IconData get icon => Icons.stop;
 }
 
-class PlayingState implements PlayerState {
+class PlayingState implements PlayerWidgetState {
   PlayState currentState = PlayState.isPaused;
 
   PlayingState() : super();
 
-  PlayerState get secondaryState => StoppedState();
+  PlayerWidgetState get secondaryState => StoppedState();
   @override
-  PlayerState get nextState => PausedState();
+  PlayerWidgetState get nextState => PausedState();
   @override
   IconData get icon => Icons.play_arrow;
 }

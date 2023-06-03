@@ -1,4 +1,4 @@
-import 'package:assets_audio_player/assets_audio_player.dart' as audioPlayer;
+import 'package:assets_audio_player/assets_audio_player.dart';
 import 'package:flutter/material.dart';
 import 'package:musicplayer_flutter/models/player_state.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
@@ -14,25 +14,19 @@ class VideoPlayerWidget extends StatefulWidget {
 }
 
 class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
-  late audioPlayer.AssetsAudioPlayer _assetsAudioPlayer;
+  late AssetsAudioPlayer _assetsAudioPlayer;
   late TextEditingController _searchController;
-  PlayerState _playerState = StoppedState().nextState;
+  PlayerWidgetState _playerState = StoppedState();
   String? _currentSongName;
   bool _isFetchingAudio = false;
 
   @override
   void initState() {
     super.initState();
-    _assetsAudioPlayer = audioPlayer.AssetsAudioPlayer.newPlayer();
+    _assetsAudioPlayer = AssetsAudioPlayer.withId("music");
     _searchController = TextEditingController();
     _searchController.text = "jaOiQmhH838";
   }
-
-  // PlayerState _getCurrentState(audioPlayer.AssetsAudioPlayer player) {
-  //   if (player.isPlaying.value) return PlayingState();
-
-  //   if (player.playerState.)
-  // }
 
   void _getAudio() async {
     setState(() {
@@ -47,7 +41,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
     if (audio == null) return;
     try {
       _assetsAudioPlayer.open(
-        audioPlayer.Audio.network(audio.url.toString()),
+        Audio.network(audio.url.toString()),
         autoStart: false,
       );
       setState(() {
@@ -113,7 +107,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
                 onPressed: () {
                   _assetsAudioPlayer.stop();
                   setState(() {
-                    _playerState = StoppedState().nextState;
+                    _playerState = StoppedState();
                   });
                 },
                 icon: Icon(Icons.stop),
