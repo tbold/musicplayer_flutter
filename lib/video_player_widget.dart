@@ -1,6 +1,8 @@
 import 'package:assets_audio_player/assets_audio_player.dart';
 import 'package:flutter/material.dart';
+import 'package:musicplayer_flutter/models/audio_detail.dart';
 import 'package:musicplayer_flutter/models/player_state.dart';
+import 'package:musicplayer_flutter/widgets/audio_detail.widget.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import 'package:collection/collection.dart';
 
@@ -17,7 +19,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
   late AssetsAudioPlayer _assetsAudioPlayer;
   late TextEditingController _searchController;
   PlayerWidgetState _playerState = StoppedState();
-  String? _currentSongName;
+  AudioDetail? _audioDetail;
   bool _isFetchingAudio = false;
 
   @override
@@ -32,8 +34,25 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
     setState(() {
       _isFetchingAudio = true;
     });
-    final StreamManifest manifest = await _youtubeExplode.videos.streamsClient
-        .getManifest(_searchController.text);
+
+    late StreamManifest manifest;
+    late Video videoDetails;
+
+    try {
+      await Future.wait([
+        (() async => manifest = await _youtubeExplode.videos.streamsClient
+            .getManifest(_searchController.text))(),
+        (() async => videoDetails =
+            await _youtubeExplode.videos.get(_searchController.text))(),
+      ]);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        backgroundColor: Theme.of(context).colorScheme.error,
+        content: Text(e.toString()),
+      ));
+      _isFetchingAudio = false;
+      return;
+    }
 
     List<AudioOnlyStreamInfo> audios = manifest.audioOnly;
     var audio = audios
@@ -46,6 +65,10 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
       );
       setState(() {
         _playerState = StoppedState();
+        _audioDetail = AudioDetail(
+            title: videoDetails.title,
+            artist: videoDetails.author,
+            duration: videoDetails.duration);
       });
     } catch (e) {
       print("something went wrong");
@@ -84,9 +107,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
                   onPressed: () async => _getAudio(), icon: Icon(Icons.search))
             ],
           ),
-          _isFetchingAudio
-              ? CircularProgressIndicator()
-              : Text(_currentSongName ?? ''),
+          const SizedBox(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -114,6 +135,10 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
               ),
             ],
           ),
+          const SizedBox(height: 16),
+          _isFetchingAudio
+              ? CircularProgressIndicator()
+              : AudioDetailWidget(audioDetail: _audioDetail),
         ]),
       ),
     );
