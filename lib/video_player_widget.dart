@@ -31,6 +31,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
   }
 
   void _getAudio() async {
+    if (_searchController.text.trim() == '') return;
     setState(() {
       _isFetchingAudio = true;
     });
@@ -68,7 +69,8 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
         _audioDetail = AudioDetail(
             title: videoDetails.title,
             artist: videoDetails.author,
-            duration: videoDetails.duration);
+            duration: videoDetails.duration,
+            thumbnailUrl: videoDetails.thumbnails.mediumResUrl);
       });
     } catch (e) {
       print("something went wrong");
@@ -98,8 +100,14 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
             children: [
               Expanded(
                 child: TextField(
-                  decoration:
-                      InputDecoration(label: Text('Enter a youtube id')),
+                  decoration: InputDecoration(
+                      label: Text(
+                    'Enter a youtube id',
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodyMedium!
+                        .copyWith(fontSize: 16),
+                  )),
                   controller: _searchController,
                 ),
               ),
@@ -107,6 +115,10 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
                   onPressed: () async => _getAudio(), icon: Icon(Icons.search))
             ],
           ),
+          const SizedBox(height: 48),
+          _isFetchingAudio
+              ? CircularProgressIndicator()
+              : AudioDetailWidget(audioDetail: _audioDetail),
           const SizedBox(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -135,10 +147,6 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          _isFetchingAudio
-              ? CircularProgressIndicator()
-              : AudioDetailWidget(audioDetail: _audioDetail),
         ]),
       ),
     );
