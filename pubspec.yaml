@@ -39,6 +39,8 @@ dependencies:
   assets_audio_player: ^3.0.6
   youtube_explode_dart: ^1.12.4
   audio_service: ^0.18.10
+  http: ^0.13.6
+  webview_flutter: ^4.2.2
 
 dev_dependencies:
   flutter_test:

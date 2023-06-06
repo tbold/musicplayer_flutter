@@ -1,8 +1,12 @@
+import 'dart:convert';
+
+import 'package:http/http.dart' as http;
 import 'package:assets_audio_player/assets_audio_player.dart';
 import 'package:flutter/material.dart';
 import 'package:musicplayer_flutter/models/audio_detail.dart';
 import 'package:musicplayer_flutter/models/player_state.dart';
 import 'package:musicplayer_flutter/widgets/audio_detail.widget.dart';
+import 'package:musicplayer_flutter/widgets/web_view.widget.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import 'package:collection/collection.dart';
 
@@ -21,6 +25,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
   PlayerWidgetState _playerState = StoppedState();
   AudioDetail? _audioDetail;
   bool _isFetchingAudio = false;
+  String? _html;
 
   @override
   void initState() {
@@ -36,6 +41,20 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
       _isFetchingAudio = true;
     });
 
+    if (_searchController.text.startsWith('/sc/')) {
+      _getSoundCloudAudio();
+      return;
+    }
+    if (_searchController.text.startsWith('/yt/')) {
+      _getYoutubeAudio();
+      return;
+    }
+    setState(() {
+      _isFetchingAudio = false;
+    });
+  }
+
+  void _getYoutubeAudio() async {
     late StreamManifest manifest;
     late Video videoDetails;
 
@@ -71,6 +90,31 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
             artist: videoDetails.author,
             duration: videoDetails.duration,
             thumbnailUrl: videoDetails.thumbnails.mediumResUrl);
+      });
+    } catch (e) {
+      print("something went wrong");
+    }
+  }
+
+  void _getSoundCloudAudio() async {
+    if (_searchController.text.trim() == '') return;
+    setState(() {
+      _isFetchingAudio = true;
+    });
+
+    try {
+      var resp = await http.get(Uri.parse(
+          "http://soundcloud.com/oembed?format=json&url=https://soundcloud.com/gunna/bread-butter&iframe=true&autoplay=true"));
+
+      var html = jsonDecode(resp.body)['html'];
+
+      setState(() {
+        _playerState = StoppedState();
+        _audioDetail = AudioDetail(
+          title: 'videoDetails.title',
+          artist: 'videoDetails.author',
+        );
+        _html = html;
       });
     } catch (e) {
       print("something went wrong");
@@ -112,13 +156,18 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
                 ),
               ),
               IconButton(
-                  onPressed: () async => _getAudio(), icon: Icon(Icons.search))
+                  onPressed: () async => _getSoundCloudAudio(),
+                  icon: Icon(Icons.search))
             ],
           ),
           const SizedBox(height: 48),
           _isFetchingAudio
               ? CircularProgressIndicator()
-              : AudioDetailWidget(audioDetail: _audioDetail),
+              : _html == null
+                  ? AudioDetailWidget(audioDetail: _audioDetail)
+                  : WebView(
+                      html: _html!,
+                    ),
           const SizedBox(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
