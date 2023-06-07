@@ -1,12 +1,12 @@
 import 'dart:convert';
 
-import 'package:http/http.dart' as http;
 import 'package:assets_audio_player/assets_audio_player.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:musicplayer_flutter/models/audio_detail.dart';
+import 'package:musicplayer_flutter/models/server_track.dart';
 import 'package:musicplayer_flutter/models/player_state.dart';
-import 'package:musicplayer_flutter/widgets/audio_detail.widget.dart';
-import 'package:musicplayer_flutter/widgets/web_view.widget.dart';
+import 'package:musicplayer_flutter/utils.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import 'package:collection/collection.dart';
 
@@ -23,38 +23,33 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
   late AssetsAudioPlayer _assetsAudioPlayer;
   late TextEditingController _searchController;
   PlayerWidgetState _playerState = StoppedState();
-  AudioDetail? _audioDetail;
-  bool _isFetchingAudio = false;
-  String? _html;
+  late Future<List<ServerTrack>> _playlist;
+
+  Future<List<ServerTrack>> _getAudio() async {
+    if (_searchController.text.trim() == '') return [];
+
+    var result =
+        await http.get(Utils.playlistById(_searchController.text.trim()));
+
+    if (result.statusCode != 200) return [];
+    var body = jsonDecode(result.body) as Map;
+    if (body['tracks'] == null) return [];
+    List<ServerTrack> playlist =
+        (body['tracks'] as List).map((e) => ServerTrack.fromJson(e)).toList();
+
+    return playlist;
+  }
 
   @override
   void initState() {
     super.initState();
     _assetsAudioPlayer = AssetsAudioPlayer.withId("music");
     _searchController = TextEditingController();
-    _searchController.text = "jaOiQmhH838";
+    _searchController.text = Utils.examplePlaylistId;
+    _playlist = _getAudio();
   }
 
-  void _getAudio() async {
-    if (_searchController.text.trim() == '') return;
-    setState(() {
-      _isFetchingAudio = true;
-    });
-
-    if (_searchController.text.startsWith('/sc/')) {
-      _getSoundCloudAudio();
-      return;
-    }
-    if (_searchController.text.startsWith('/yt/')) {
-      _getYoutubeAudio();
-      return;
-    }
-    setState(() {
-      _isFetchingAudio = false;
-    });
-  }
-
-  void _getYoutubeAudio() async {
+  Future<AudioDetail?> _getYoutubeAudio() async {
     late StreamManifest manifest;
     late Video videoDetails;
 
@@ -65,64 +60,38 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
         (() async => videoDetails =
             await _youtubeExplode.videos.get(_searchController.text))(),
       ]);
+      // _assetsAudioPlayer.open(
+      //   Audio.network(audio.url.toString()),
+      //   autoStart: false,
+      // );
+      setState(() {
+        _playerState = StoppedState();
+      });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        backgroundColor: Theme.of(context).colorScheme.error,
-        content: Text(e.toString()),
-      ));
-      _isFetchingAudio = false;
-      return;
+      // ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      //   backgroundColor: Theme.of(context).colorScheme.error,
+      //   content: Text(e.toString()),
+      // ));
+      // _isFetchingAudio = false;
+      return null;
     }
 
     List<AudioOnlyStreamInfo> audios = manifest.audioOnly;
     var audio = audios
         .firstWhereOrNull((element) => element.audioCodec.startsWith('mp4'));
-    if (audio == null) return;
+    if (audio == null) return null;
     try {
-      _assetsAudioPlayer.open(
-        Audio.network(audio.url.toString()),
-        autoStart: false,
-      );
-      setState(() {
-        _playerState = StoppedState();
-        _audioDetail = AudioDetail(
-            title: videoDetails.title,
-            artist: videoDetails.author,
-            duration: videoDetails.duration,
-            thumbnailUrl: videoDetails.thumbnails.mediumResUrl);
-      });
+      return AudioDetail(
+          title: videoDetails.title,
+          artist: videoDetails.author,
+          duration: videoDetails.duration,
+          thumbnailUrl: videoDetails.thumbnails.mediumResUrl,
+          streamUrl: audio.url.toString());
+      // });
     } catch (e) {
       print("something went wrong");
+      return null;
     }
-  }
-
-  void _getSoundCloudAudio() async {
-    if (_searchController.text.trim() == '') return;
-    setState(() {
-      _isFetchingAudio = true;
-    });
-
-    try {
-      var resp = await http.get(Uri.parse(
-          "http://soundcloud.com/oembed?format=json&url=https://soundcloud.com/gunna/bread-butter&iframe=true&autoplay=true"));
-
-      var html = jsonDecode(resp.body)['html'];
-
-      setState(() {
-        _playerState = StoppedState();
-        _audioDetail = AudioDetail(
-          title: 'videoDetails.title',
-          artist: 'videoDetails.author',
-        );
-        _html = html;
-      });
-    } catch (e) {
-      print("something went wrong");
-    }
-
-    setState(() {
-      _isFetchingAudio = false;
-    });
   }
 
   @override
@@ -138,66 +107,92 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
     return Scaffold(
       appBar: AppBar(title: Text('musicplayer home page')),
       body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  decoration: InputDecoration(
-                      label: Text(
-                    'Enter a youtube id',
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodyMedium!
-                        .copyWith(fontSize: 16),
-                  )),
-                  controller: _searchController,
-                ),
-              ),
-              IconButton(
-                  onPressed: () async => _getSoundCloudAudio(),
-                  icon: Icon(Icons.search))
-            ],
-          ),
-          const SizedBox(height: 48),
-          _isFetchingAudio
-              ? CircularProgressIndicator()
-              : _html == null
-                  ? AudioDetailWidget(audioDetail: _audioDetail)
-                  : WebView(
-                      html: _html!,
-                    ),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              IconButton(
-                icon: Icon(_playerState.nextState.icon),
-                onPressed: () async {
-                  try {
-                    _assetsAudioPlayer.playOrPause();
-                    setState(() {
-                      _playerState = _playerState.nextState;
-                    });
-                  } catch (e) {
-                    print("something went wrong");
-                  }
-                },
-              ),
-              IconButton(
-                onPressed: () {
-                  _assetsAudioPlayer.stop();
-                  setState(() {
-                    _playerState = StoppedState();
-                  });
-                },
-                icon: Icon(Icons.stop),
-              ),
-            ],
-          ),
-        ]),
-      ),
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: FutureBuilder<List<ServerTrack>>(
+              future: _playlist,
+              builder: ((context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const CircularProgressIndicator();
+                }
+
+                if (snapshot.connectionState == ConnectionState.done) {
+                  final List<ServerTrack> tracks = snapshot.data!;
+
+                  return Column(
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              decoration: InputDecoration(
+                                  label: Text(
+                                'Enter a playlist id',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyMedium!
+                                    .copyWith(fontSize: 16),
+                              )),
+                              controller: _searchController,
+                            ),
+                          ),
+                          IconButton(
+                              onPressed: () async {
+                                setState(() {
+                                  _playlist = _getAudio();
+                                });
+                              },
+                              icon: Icon(Icons.search))
+                        ],
+                      ),
+                      (snapshot.data == null || snapshot.data!.isEmpty)
+                          ? const Center(
+                              child: Text('No tracks found'),
+                            )
+                          : SizedBox(
+                              height: 500,
+                              width: 500,
+                              child: ListView.builder(
+                                  itemCount: tracks.length,
+                                  itemBuilder: (ctx, idx) {
+                                    return ListTile(
+                                      title: Text(tracks[idx].trackName),
+                                    );
+                                  }),
+                            ),
+                      Expanded(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            IconButton(
+                              icon: Icon(_playerState.nextState.icon),
+                              onPressed: () async {
+                                try {
+                                  _assetsAudioPlayer.playOrPause();
+                                  setState(() {
+                                    _playerState = _playerState.nextState;
+                                  });
+                                } catch (e) {
+                                  print("something went wrong");
+                                }
+                              },
+                            ),
+                            IconButton(
+                              onPressed: () {
+                                _assetsAudioPlayer.stop();
+                                setState(() {
+                                  _playerState = StoppedState();
+                                });
+                              },
+                              icon: Icon(Icons.stop),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  );
+                }
+                return Container();
+              }))),
     );
   }
 }
